@@ -1,0 +1,78 @@
+# Deployment compose for the SHARED Oracle box (Dokploy + Traefik). Mirrors mac-auth's
+# docker-compose.dokploy.yml.
+#
+# Traefik (run by Dokploy) already owns 80/443 and terminates TLS via Let's Encrypt, so
+# this stack publishes NO host ports — Traefik reaches the app over the shared
+# `dokploy-network`. Do NOT hand-write Traefik labels here: deploy this as a Dokploy
+# "Compose" service, then add the domain (crm.monashcoding.com, container port 3000,
+# HTTPS/Let's Encrypt) in Dokploy's Domains tab — Dokploy writes the Traefik labels for you.
+#
+# crm.monashcoding.com is a *.monashcoding.com subdomain, so mac-auth trusts it
+# automatically — no auth-side change is needed to onboard this app.
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AUTH_URL: https://auth.monashcoding.com
+      JWT_ISSUER: https://auth.monashcoding.com
+      JWT_AUDIENCE: mac-suite
+      PORT: "3000"
+    expose:
+      - "3000"
+    networks:
+      - dokploy-network # Traefik lives here; this is how it reaches us.
+      - internal # private link to postgres.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # CMD applies migrations (incl. pg_trgm) then serves SPA + API on :3000.
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_KEEP_DAYS: "${BACKUP_KEEP_DAYS:-14}"
+    volumes:
+      - ./backup/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./backups:/backups
+    networks:
+      - internal
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  # Shared Dokploy/Traefik network — already exists on the host.
+  dokploy-network:
+    external: true
+  # Private network for app <-> postgres <-> backup.
+  internal:
+
+volumes:
+  pg_data:

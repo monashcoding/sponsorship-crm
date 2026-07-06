@@ -1,0 +1,37 @@
+{
+  "name": "mac-sponsorship-crm",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "npm --prefix web install && npm --prefix web run build",
+    "build:server": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm --prefix web run typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "express": "^4.21.2",
+    "jose": "^5.9.6",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
