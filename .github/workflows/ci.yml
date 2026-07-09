@@ -65,14 +65,20 @@ jobs:
             exit 1
           fi
           echo "CI passed on main — triggering Dokploy deploy..."
-          # -L follows redirects (Dokploy may 301 http->https); --post301/302/303
-          # keep the request a POST across the redirect instead of downgrading to GET.
-          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
-            -L --post301 --post302 --post303 \
+          # Dokploy's deploy webhook mimics GitHub's: it reads the branch from the
+          # payload `ref` and only deploys if it matches the service's branch. A
+          # request with no payload returns 301 {"message":"Branch Not Match"} and
+          # does nothing, so we POST a GitHub-style push payload for main.
+          resp=$(mktemp)
+          code=$(curl -sS -o "$resp" -w '%{http_code}' -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d '{"ref":"refs/heads/main"}' \
             "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}")
-          echo "Dokploy responded HTTP $code (after following any redirects)"
-          # Dokploy returns 2xx when the deploy is accepted; treat anything else as failure.
+          echo "Dokploy responded HTTP $code: $(cat "$resp")"
+          # Dokploy returns 2xx when the deploy is accepted; a 301 "Branch Not Match"
+          # (or anything non-2xx) means it did NOT deploy.
           case "$code" in
             2*) echo "Deploy triggered." ;;
-            *) echo "::error::Dokploy webhook returned HTTP $code"; exit 1 ;;
+            *) echo "::error::Dokploy did not deploy (HTTP $code): $(cat "$resp")"; exit 1 ;;
           esac
