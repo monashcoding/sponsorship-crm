@@ -1,0 +1,74 @@
+name: CI/CD
+
+# CI runs on every push and PR. Deploy runs only after CI passes on `main`,
+# by pinging Dokploy's deploy webhook (stored as the DOKPLOY_DEPLOY_WEBHOOK secret).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint · Typecheck · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      # Reproducible installs from the committed lockfiles (both packages).
+      - name: Install server deps
+        run: npm ci
+      - name: Install web deps
+        run: npm --prefix web ci
+
+      # Advisory only for now: the codebase isn't Biome-formatted yet, so this
+      # would fail on style/formatting noise rather than real defects. Kept
+      # visible in CI so issues are surfaced; flip `continue-on-error` to false
+      # once the code is formatted (`npm run lint:fix`) and a biome.json is added.
+      - name: Lint (Biome) — advisory
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck (server + web)
+        run: npm run typecheck
+
+      # Full production build: SPA (tsc + vite) then server (tsc). This is the
+      # same build the Docker image runs, so a green build here means the image
+      # will build too.
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Dokploy
+    needs: ci
+    # Only deploy real pushes to main — never PRs, never other branches.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dokploy deploy webhook
+        run: |
+          if [ -z "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}" ]; then
+            echo "::error::DOKPLOY_DEPLOY_WEBHOOK secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "CI passed on main — triggering Dokploy deploy..."
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}")
+          echo "Dokploy responded HTTP $code"
+          # Dokploy returns 2xx when the deploy is accepted; treat anything else as failure.
+          case "$code" in
+            2*) echo "Deploy triggered." ;;
+            *) echo "::error::Dokploy webhook returned HTTP $code"; exit 1 ;;
+          esac
