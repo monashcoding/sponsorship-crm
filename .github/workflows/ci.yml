@@ -65,8 +65,12 @@ jobs:
             exit 1
           fi
           echo "CI passed on main — triggering Dokploy deploy..."
-          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}")
-          echo "Dokploy responded HTTP $code"
+          # -L follows redirects (Dokploy may 301 http->https); --post301/302/303
+          # keep the request a POST across the redirect instead of downgrading to GET.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -L --post301 --post302 --post303 \
+            "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}")
+          echo "Dokploy responded HTTP $code (after following any redirects)"
           # Dokploy returns 2xx when the deploy is accepted; treat anything else as failure.
           case "$code" in
             2*) echo "Deploy triggered." ;;
