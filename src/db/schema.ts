@@ -3,8 +3,10 @@ import {
 	integer,
 	pgEnum,
 	pgTable,
+	primaryKey,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 
@@ -57,6 +59,48 @@ export const companies = pgTable(
 			.defaultNow(),
 	},
 	(t) => ({ normIdx: index("companies_name_norm_idx").on(t.nameNormalized) }),
+);
+
+// --- Tags: free-form labels the committee defines --------------------------
+// e.g. "Sponsors 2026", "Networking Night". Reusable across companies; the join
+// table below is the many-to-many. `nameNormalized` is uniquely indexed so the
+// same label can't be created twice (case/whitespace-insensitive).
+export const tags = pgTable(
+	"tags",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		name: text("name").notNull(),
+		nameNormalized: text("name_normalized").notNull(),
+		color: text("color").notNull(), // hex; assigned at creation from a fixed palette
+		createdBy: text("created_by").notNull(), // macUserId
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		nameUniq: uniqueIndex("tags_name_norm_uniq").on(t.nameNormalized),
+	}),
+);
+
+// --- Company ↔ tag join (many-to-many) -------------------------------------
+export const companyTags = pgTable(
+	"company_tags",
+	{
+		companyId: uuid("company_id")
+			.notNull()
+			.references(() => companies.id, { onDelete: "cascade" }),
+		tagId: uuid("tag_id")
+			.notNull()
+			.references(() => tags.id, { onDelete: "cascade" }),
+		addedBy: text("added_by").notNull(), // macUserId
+		addedAt: timestamp("added_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => ({
+		pk: primaryKey({ columns: [t.companyId, t.tagId] }),
+		tagIdx: index("company_tags_tag_idx").on(t.tagId),
+	}),
 );
 
 // --- Contacts (nested under a company) -------------------------------------
@@ -160,6 +204,7 @@ export const reassignments = pgTable("reassignments", {
 
 export type Company = typeof companies.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
+export type Tag = typeof tags.$inferSelect;
 export type Touchpoint = typeof touchpoints.$inferSelect;
 export type Stage = (typeof stageEnum.enumValues)[number];
 export type TouchpointStatus = (typeof statusEnum.enumValues)[number];

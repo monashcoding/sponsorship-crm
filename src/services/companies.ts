@@ -9,6 +9,18 @@ import {
 } from "../db/schema.js";
 import { normalizeName } from "../lib/normalize.js";
 
+// Tags for a company as a JSON array, aggregated inline so a company list is still a
+// single query. COALESCE keeps it an empty array (never null) when there are no tags.
+// NOTE: the outer correlation is written as the literal `companies.id`, NOT
+// `${companies.id}`. Drizzle renders a main-table column as a bare "id", which a
+// subquery whose own table also has an id column captures — silently breaking the
+// correlation. Qualifying by table name here prevents that capture.
+const tagsJson = sql<{ id: string; name: string; color: string }[]>`COALESCE((
+	SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
+	FROM company_tags ct JOIN tags t ON t.id = ct.tag_id
+	WHERE ct.company_id = companies.id
+), '[]'::json)`;
+
 // --- Fuzzy-dedupe (§5) -----------------------------------------------------
 export interface DupeCandidate {
 	id: string;
@@ -96,6 +108,7 @@ export interface CompanyListFilters {
 	stage?: Stage;
 	owner?: string;
 	q?: string;
+	tag?: string; // tag id — only companies carrying this tag
 }
 
 export async function listCompanies(db: DB, filters: CompanyListFilters) {
@@ -103,6 +116,11 @@ export async function listCompanies(db: DB, filters: CompanyListFilters) {
 	if (filters.stage) conds.push(eq(companies.stage, filters.stage));
 	if (filters.owner) conds.push(eq(companies.owner, filters.owner));
 	if (filters.q) conds.push(sql`${companies.name} ILIKE ${`%${filters.q}%`}`);
+	if (filters.tag) {
+		conds.push(
+			sql`EXISTS (SELECT 1 FROM company_tags ct WHERE ct.company_id = ${companies.id} AND ct.tag_id = ${filters.tag})`,
+		);
+	}
 	const where = conds.length ? and(...conds) : undefined;
 
 	return db
@@ -120,7 +138,7 @@ export async function listCompanies(db: DB, filters: CompanyListFilters) {
 			// has-reply: any touchpoint whose LATEST event is 'replied'
 			hasReply: sql<boolean>`EXISTS (
         SELECT 1 FROM ${touchpoints} tp
-        WHERE tp.company_id = ${companies.id}
+        WHERE tp.company_id = companies.id
           AND (
             SELECT te.status FROM touchpoint_events te
             WHERE te.touchpoint_id = tp.id
@@ -130,10 +148,11 @@ export async function listCompanies(db: DB, filters: CompanyListFilters) {
 			// overdue: any touchpoint with a past follow-up date (§4 default: regardless of status)
 			overdue: sql<boolean>`EXISTS (
         SELECT 1 FROM ${touchpoints} tp
-        WHERE tp.company_id = ${companies.id}
+        WHERE tp.company_id = companies.id
           AND tp.next_follow_up_at IS NOT NULL
           AND tp.next_follow_up_at <= now()
       )`.as("overdue"),
+			tags: tagsJson.as("tags"),
 		})
 		.from(companies)
 		.where(where)
@@ -163,11 +182,17 @@ export async function getCompanyDetail(db: DB, id: string) {
 		.where(eq(stageHistory.companyId, id))
 		.orderBy(desc(stageHistory.changedAt));
 
+	const [{ tags: companyTagList } = { tags: [] }] = await db
+		.select({ tags: tagsJson })
+		.from(companies)
+		.where(eq(companies.id, id));
+
 	return {
 		company,
 		contacts: companyContacts,
 		touchpoints: tps,
 		stageHistory: history,
+		tags: companyTagList,
 	};
 }
 
@@ -188,12 +213,12 @@ export async function listCompanyTouchpoints(db: DB, companyId: string) {
 			createdAt: touchpoints.createdAt,
 			currentStatus: sql<string>`(
         SELECT te.status FROM touchpoint_events te
-        WHERE te.touchpoint_id = ${touchpoints.id}
+        WHERE te.touchpoint_id = touchpoints.id
         ORDER BY te.at DESC, te.id DESC LIMIT 1
       )`.as("current_status"),
 			statusAt: sql<string>`(
         SELECT te.at FROM touchpoint_events te
-        WHERE te.touchpoint_id = ${touchpoints.id}
+        WHERE te.touchpoint_id = touchpoints.id
         ORDER BY te.at DESC, te.id DESC LIMIT 1
       )`.as("status_at"),
 		})

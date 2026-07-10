@@ -15,6 +15,13 @@
       "when": 1783656952569,
       "tag": "0001_reflective_lizard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783658085419,
+      "tag": "0002_daily_albert_cleary",
+      "breakpoints": true
     }
   ]
 }

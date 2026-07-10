@@ -20,6 +20,13 @@ import {
 } from "../services/companies.js";
 import { listMembers } from "../services/members.js";
 import { reassign } from "../services/reassign.js";
+import {
+	deleteTag,
+	getOrCreateTag,
+	listTags,
+	tagCompany,
+	untagCompany,
+} from "../services/tags.js";
 import { recordTouchpointStatus } from "../services/touchpointStatus.js";
 
 const stageSchema = z.enum(stageEnum.enumValues);
@@ -55,6 +62,7 @@ api.get(
 				stage: stageSchema.optional(),
 				owner: z.string().optional(),
 				q: z.string().optional(),
+				tag: z.string().uuid().optional(),
 			})
 			.parse(req.query);
 		res.json(await listCompanies(db, q));
@@ -153,6 +161,63 @@ api.post(
 		);
 		if (!moved) throw new HttpError(404, "company not found");
 		res.json(moved);
+	}),
+);
+
+// --- Tags ------------------------------------------------------------------
+api.get(
+	"/tags",
+	asyncHandler(async (_req, res) => {
+		res.json(await listTags(db));
+	}),
+);
+
+// Create a tag up-front (the company tag input also creates on demand).
+api.post(
+	"/tags",
+	asyncHandler(async (req, res) => {
+		const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+		const tag = await getOrCreateTag(db, name, claimsOf(req).macUserId);
+		res.status(201).json(tag);
+	}),
+);
+
+api.delete(
+	"/tags/:id",
+	asyncHandler(async (req, res) => {
+		const ok = await deleteTag(db, param(req, "id"));
+		if (!ok) throw new HttpError(404, "tag not found");
+		res.status(204).end();
+	}),
+);
+
+// Attach a tag to a company — by existing tagId, or by name (created if new).
+api.post(
+	"/companies/:id/tags",
+	asyncHandler(async (req, res) => {
+		const body = z
+			.object({
+				tagId: z.string().uuid().optional(),
+				name: z.string().optional(),
+			})
+			.parse(req.body);
+		const by = claimsOf(req).macUserId;
+
+		let tagId = body.tagId;
+		if (!tagId) {
+			if (!body.name) throw new HttpError(400, "tagId or name required");
+			tagId = (await getOrCreateTag(db, body.name, by)).id;
+		}
+		await tagCompany(db, param(req, "id"), tagId, by);
+		res.status(201).json({ ok: true, tagId });
+	}),
+);
+
+api.delete(
+	"/companies/:id/tags/:tagId",
+	asyncHandler(async (req, res) => {
+		await untagCompany(db, param(req, "id"), param(req, "tagId"));
+		res.status(204).end();
 	}),
 );
 
@@ -305,8 +370,11 @@ api.patch(
 // --- Pipeline board --------------------------------------------------------
 api.get(
 	"/pipeline",
-	asyncHandler(async (_req, res) => {
-		const rows = await listCompanies(db, {});
+	asyncHandler(async (req, res) => {
+		const { tag } = z
+			.object({ tag: z.string().uuid().optional() })
+			.parse(req.query);
+		const rows = await listCompanies(db, { tag });
 		const board: Record<string, typeof rows> = {};
 		for (const stage of stageEnum.enumValues) board[stage] = [];
 		for (const row of rows) board[row.stage]?.push(row);
@@ -333,7 +401,7 @@ api.get(
 				nextFollowUpAt: touchpoints.nextFollowUpAt,
 				currentStatus: sql<string>`(
           SELECT te.status FROM touchpoint_events te
-          WHERE te.touchpoint_id = ${touchpoints.id}
+          WHERE te.touchpoint_id = touchpoints.id
           ORDER BY te.at DESC, te.id DESC LIMIT 1
         )`.as("current_status"),
 			})
@@ -372,11 +440,11 @@ api.get(
 				stage: companies.stage,
 				ownerName: sql<string | null>`(
           SELECT coalesce(m.name, m.email) FROM crm_member m
-          WHERE m.mac_user_id = ${companies.owner}
+          WHERE m.mac_user_id = companies.owner
         )`.as("owner_name"),
 				hasReply: sql<boolean>`EXISTS (
           SELECT 1 FROM ${touchpoints} tp
-          WHERE tp.company_id = ${companies.id}
+          WHERE tp.company_id = companies.id
             AND (
               SELECT te.status FROM touchpoint_events te
               WHERE te.touchpoint_id = tp.id
@@ -384,7 +452,7 @@ api.get(
             ) = 'replied'
         )`.as("has_reply"),
 				lastTouch: sql<string | null>`(
-          SELECT max(tp.sent_at) FROM ${touchpoints} tp WHERE tp.company_id = ${companies.id}
+          SELECT max(tp.sent_at) FROM ${touchpoints} tp WHERE tp.company_id = companies.id
         )`.as("last_touch"),
 			})
 			.from(companies)

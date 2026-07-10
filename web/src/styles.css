@@ -344,6 +344,75 @@ select {
 	padding: 4px 10px;
 	font-size: 12px;
 }
+/* --- Tags --- */
+.tag-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+}
+.tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 2px 8px;
+	font-size: 12px;
+	white-space: nowrap;
+}
+.tag-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex: none;
+}
+.tag-x {
+	background: none;
+	border: none;
+	color: var(--muted);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+	padding: 0 0 0 2px;
+}
+.tag-x:hover {
+	color: var(--text);
+}
+.tag-filter {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 16px;
+}
+.tag-filter-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	padding: 4px 10px;
+	font-size: 12px;
+	color: var(--text);
+	cursor: pointer;
+}
+.tag-filter-chip:hover {
+	border-color: var(--accent);
+}
+.tag-filter-chip.active {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+.tag-filter-chip.active .muted {
+	color: #dfe6ff;
+}
+.tag-editor .inline-form {
+	margin-top: 10px;
+}
+
 .contact-list {
 	list-style: none;
 	padding: 0;

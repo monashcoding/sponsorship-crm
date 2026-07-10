@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AddCompanyModal } from "../components/AddCompanyModal.js";
+import { TagChip, TagFilterBar } from "../components/Tags.js";
 import { api } from "../lib/api.js";
 import {
 	type CompanyRow,
@@ -15,8 +16,12 @@ export function PipelinePage() {
 	const [view, setView] = useState<"board" | "table">("board");
 	const [adding, setAdding] = useState(false);
 	const [dragId, setDragId] = useState<string | null>(null);
+	const [tagFilter, setTagFilter] = useState<string | null>(null);
 
-	const pipeline = useQuery({ queryKey: ["pipeline"], queryFn: api.pipeline });
+	const pipeline = useQuery({
+		queryKey: ["pipeline", tagFilter],
+		queryFn: () => api.pipeline(tagFilter ?? undefined),
+	});
 
 	const move = useMutation({
 		mutationFn: ({ id, stage }: { id: string; stage: Stage }) =>
@@ -53,6 +58,8 @@ export function PipelinePage() {
 					</button>
 				</div>
 			</div>
+
+			<TagFilterBar active={tagFilter} onChange={setTagFilter} />
 
 			{pipeline.isLoading && <p className="muted">Loading…</p>}
 
@@ -93,6 +100,7 @@ export function PipelinePage() {
 						<tr>
 							<th>Company</th>
 							<th>Stage</th>
+							<th>Tags</th>
 							<th>Reply</th>
 							<th>Overdue</th>
 						</tr>
@@ -104,6 +112,13 @@ export function PipelinePage() {
 									<Link to={`/companies/${c.id}`}>{c.name}</Link>
 								</td>
 								<td>{STAGE_LABELS[c.stage]}</td>
+								<td>
+									<div className="tag-list">
+										{c.tags.map((t) => (
+											<TagChip key={t.id} tag={t} />
+										))}
+									</div>
+								</td>
 								<td>{c.hasReply ? "✅" : ""}</td>
 								<td>{c.overdue ? "⚠️" : ""}</td>
 							</tr>
@@ -139,6 +154,13 @@ function CompanyCard({
 				{company.overdue && <span className="flag" title="Overdue follow-up" />}
 				{company.industry && <span className="muted">{company.industry}</span>}
 			</div>
+			{company.tags.length > 0 && (
+				<div className="tag-list">
+					{company.tags.map((t) => (
+						<TagChip key={t.id} tag={t} />
+					))}
+				</div>
+			)}
 		</Link>
 	);
 }
