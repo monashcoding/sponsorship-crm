@@ -132,6 +132,21 @@ export const stageHistory = pgTable("stage_history", {
 	changedBy: text("changed_by").notNull(), // macUserId
 });
 
+// --- Gmail sync checkpoint (one row per mailbox) ---------------------------
+// The GmailReplyDetector polls incrementally: each run resumes from the last
+// Gmail historyId we processed for that mailbox. `mailboxKey` is the stable id
+// from the mailbox registry (e.g. "sponsorship"), so adding recruitment@/events@
+// later is just new rows — no schema change.
+export const gmailSyncState = pgTable("gmail_sync_state", {
+	mailboxKey: text("mailbox_key").primaryKey(), // "sponsorship" | "recruitment" | "events"
+	email: text("email").notNull(), // the address that consented (for display/debug)
+	lastHistoryId: text("last_history_id"), // Gmail history cursor; null until first seed
+	lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+	updatedAt: timestamp("updated_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+});
+
 // --- Reassignment log (handover institutional record) ----------------------
 export const reassignments = pgTable("reassignments", {
 	id: uuid("id").defaultRandom().primaryKey(),

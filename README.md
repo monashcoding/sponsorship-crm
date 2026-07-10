@@ -88,10 +88,47 @@ Set `POSTGRES_USER/PASSWORD/DB` and `BACKUP_KEEP_DAYS` in Dokploy's env.
 
 **Redeploy = push to `main`, then Deploy in Dokploy.**
 
+## Gmail reply detection
+
+Automatically flips a touchpoint to `replied` (or `bounced`) when a sponsor answers — no manual
+status update. Inbound mail is matched to a contact's email and fed through the *same*
+`recordTouchpointStatus` choke point as manual updates, tagged `source:"gmail"`. The poller only
+**reads** mail (`gmail.readonly`), and stores header facts (who replied), never message bodies.
+
+**How it fits together**
+
+| Piece | File |
+|---|---|
+| Mailbox registry (add recruitment@/events@ here) | `src/gmail/mailboxes.ts` |
+| OAuth2 + refresh-token client | `src/gmail/client.ts` |
+| Detector (poll → classify → match) | `src/gmail/replyDetector.ts` |
+| Incremental cursor per mailbox | `gmail_sync_state` table + `src/gmail/syncState.ts` |
+| Cron entrypoint | `src/jobs/gmailSync.ts` (`npm run gmail:sync`) |
+| One-time token minting | `scripts/gmail-oauth.ts` (`npm run gmail:auth`) |
+
+**One-time setup**
+
+1. Google Cloud Console → new project → enable **Gmail API**.
+2. OAuth consent screen → **Internal** (monashcoding.com is Workspace, so no verification and the
+   refresh token never expires). Add scope `.../auth/gmail.readonly`.
+3. Credentials → OAuth client ID → **Desktop app**. Put the client id/secret in the app env as
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+4. `npm run gmail:auth`, **sign in as sponsorship@monashcoding.com** (not a personal account), and
+   copy the printed token into `GMAIL_SPONSORSHIP_REFRESH_TOKEN`.
+5. Schedule `npm run gmail:sync` (or `node dist/jobs/gmailSync.js`) every ~10 min via the Dokploy
+   scheduler / cron. With nothing configured it exits 0 as a no-op, so it's safe to wire up first.
+
+Onboarding `recruitment@` / `events@` later = uncomment the row in `mailboxes.ts` + run
+`gmail:auth` signed in as that inbox + set its refresh-token env var. No code changes.
+
+> **Matching caveat (v1):** a reply is attached to the contact's most recent still-open email
+> touchpoint (idempotent — it won't double-record). Precise thread matching lands when outbound
+> auto-logging stores a Gmail `threadId` on the touchpoint.
+
 ## Deferred (not built)
 
-- Gmail auto reply-detection — the seam exists (`recordTouchpointStatus` is the single status
-  writer; `ReplyDetector` interface is defined) but no detector is built.
+- Outbound auto-logging — create a touchpoint when a committee member emails a sponsor (would also
+  enable thread-level reply matching above).
 - AI outreach email generator — Phase 2.
 - Sponsorship-tier templates, deal-value dashboard, Discord follow-up pings, contract attachments.
 
