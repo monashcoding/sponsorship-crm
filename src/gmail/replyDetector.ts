@@ -182,9 +182,12 @@ export class GmailReplyDetector implements ReplyDetector {
 				and(
 					sql`lower(${contacts.email}) = ${email.toLowerCase()}`,
 					eq(touchpoints.channel, "email"),
+					// `touchpoints.id` is written literally, not as ${touchpoints.id}: drizzle
+					// renders a main-table column bare ("id"), which the inner touchpoint_events
+					// (also has an id) would capture, breaking the correlation. See companies.ts.
 					sql`(
 						SELECT te.status FROM touchpoint_events te
-						WHERE te.touchpoint_id = ${touchpoints.id}
+						WHERE te.touchpoint_id = touchpoints.id
 						ORDER BY te.at DESC, te.id DESC LIMIT 1
 					) IS DISTINCT FROM ${status}`,
 				),

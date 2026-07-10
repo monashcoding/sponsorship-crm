@@ -39,6 +39,16 @@ export interface Member {
 	lastSeenAt: string;
 }
 
+export interface Tag {
+	id: string;
+	name: string;
+	color: string;
+}
+
+export interface TagWithCount extends Tag {
+	count: number;
+}
+
 export interface CompanyRow {
 	id: string;
 	name: string;
@@ -52,6 +62,7 @@ export interface CompanyRow {
 	updatedAt: string;
 	hasReply: boolean;
 	overdue: boolean;
+	tags: Tag[];
 }
 
 export interface Contact {
@@ -107,6 +118,7 @@ export interface CompanyDetail {
 	contacts: Contact[];
 	touchpoints: Touchpoint[];
 	stageHistory: StageHistoryEntry[];
+	tags: Tag[];
 }
 
 export interface DupeCandidate {

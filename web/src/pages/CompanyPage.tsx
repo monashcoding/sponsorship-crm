@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { CompanyTagsEditor } from "../components/Tags.js";
 import { api } from "../lib/api.js";
 import {
 	fmtDate,
@@ -38,7 +39,7 @@ export function CompanyPage() {
 	if (detail.isLoading) return <p className="muted">Loading…</p>;
 	if (detail.isError || !detail.data) return <p>Company not found.</p>;
 
-	const { company, contacts, touchpoints, stageHistory } = detail.data;
+	const { company, contacts, touchpoints, stageHistory, tags } = detail.data;
 
 	return (
 		<div className="detail">
@@ -73,6 +74,11 @@ export function CompanyPage() {
 			/>
 
 			<StageStrip history={stageHistory} />
+
+			<section className="card">
+				<h2>Tags</h2>
+				<CompanyTagsEditor companyId={id} tags={tags} onChange={invalidate} />
+			</section>
 
 			<section className="card">
 				<h2>Contacts</h2>

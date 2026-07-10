@@ -88,6 +88,23 @@ Set `POSTGRES_USER/PASSWORD/DB` and `BACKUP_KEEP_DAYS` in Dokploy's env.
 
 **Redeploy = push to `main`, then Deploy in Dokploy.**
 
+## Tags
+
+Free-form labels the committee defines and applies to companies — e.g. `Sponsors 2026`,
+`Networking Night` — so the pipeline can be filtered to a cohort. Tags are reusable
+(many-to-many via `company_tags`), deduped case/whitespace-insensitively, and each gets an
+auto-assigned colour from a fixed palette.
+
+- **Apply / remove:** company detail page → Tags section (type to autocomplete an existing tag or
+  create a new one on the fly).
+- **Filter:** the chip bar on the Pipeline page filters the board/table to one tag.
+- **API:** `GET/POST /api/tags`, `DELETE /api/tags/:id`, `POST /api/companies/:id/tags`
+  (`{tagId}` or `{name}`), `DELETE /api/companies/:id/tags/:tagId`; `GET /api/companies?tag=<id>`
+  and `GET /api/pipeline?tag=<id>` filter by tag.
+
+Tags are embedded in the company list/detail payloads (`tags: [{id,name,color}]`), aggregated in
+the same query — no extra round-trip.
+
 ## Gmail reply detection
 
 Automatically flips a touchpoint to `replied` (or `bounced`) when a sponsor answers — no manual

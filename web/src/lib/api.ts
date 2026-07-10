@@ -8,6 +8,7 @@ import type {
 	Me,
 	Member,
 	Stage,
+	TagWithCount,
 	Touchpoint,
 	TouchpointStatus,
 } from "./types.js";
@@ -16,7 +17,9 @@ export const api = {
 	me: () => apiJson<Me>("/api/me"),
 	members: () => apiJson<Member[]>("/api/members"),
 
-	companies: (params: { stage?: string; owner?: string; q?: string } = {}) => {
+	companies: (
+		params: { stage?: string; owner?: string; q?: string; tag?: string } = {},
+	) => {
 		const qs = new URLSearchParams();
 		for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
 		const s = qs.toString();
@@ -76,7 +79,26 @@ export const api = {
 			body: JSON.stringify({ nextFollowUpAt }),
 		}),
 
-	pipeline: () => apiJson<Record<Stage, CompanyRow[]>>("/api/pipeline"),
+	pipeline: (tag?: string) =>
+		apiJson<Record<Stage, CompanyRow[]>>(
+			`/api/pipeline${tag ? `?tag=${tag}` : ""}`,
+		),
+
+	tags: () => apiJson<TagWithCount[]>("/api/tags"),
+
+	deleteTag: (id: string) =>
+		apiJson<null>(`/api/tags/${id}`, { method: "DELETE" }),
+
+	addCompanyTag: (companyId: string, body: { tagId?: string; name?: string }) =>
+		apiJson<{ ok: true; tagId: string }>(`/api/companies/${companyId}/tags`, {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	removeCompanyTag: (companyId: string, tagId: string) =>
+		apiJson<null>(`/api/companies/${companyId}/tags/${tagId}`, {
+			method: "DELETE",
+		}),
 
 	followUps: (overdue = false) =>
 		apiJson<FollowUp[]>(`/api/follow-ups${overdue ? "?overdue=1" : ""}`),
