@@ -12,37 +12,37 @@ import { PipelinePage } from "./pages/PipelinePage.js";
 import { ReassignPage } from "./pages/ReassignPage.js";
 
 export function App() {
-  return (
-    <Routes>
-      <Route path="/signin" element={<SignIn />} />
-      <Route path="/*" element={<Gate />} />
-    </Routes>
-  );
+	return (
+		<Routes>
+			<Route path="/signin" element={<SignIn />} />
+			<Route path="/*" element={<Gate />} />
+		</Routes>
+	);
 }
 
 function Gate() {
-  const me = useQuery<Me>({ queryKey: ["me"], queryFn: api.me, retry: false });
+	const me = useQuery<Me>({ queryKey: ["me"], queryFn: api.me, retry: false });
 
-  if (me.isLoading) return <div className="center muted">Loading…</div>;
+	if (me.isLoading) return <div className="center muted">Loading…</div>;
 
-  if (me.isError) {
-    const err = me.error;
-    if (err instanceof ApiError && err.status === 403) {
-      const body = err.body as { message?: string } | null;
-      return <Forbidden message={body?.message} />;
-    }
-    return <SignIn />;
-  }
+	if (me.isError) {
+		const err = me.error;
+		if (err instanceof ApiError && err.status === 403) {
+			const body = err.body as { message?: string } | null;
+			return <Forbidden message={body?.message} />;
+		}
+		return <SignIn />;
+	}
 
-  return (
-    <Layout me={me.data}>
-      <Routes>
-        <Route path="/" element={<PipelinePage />} />
-        <Route path="/companies/:id" element={<CompanyPage />} />
-        <Route path="/follow-ups" element={<FollowUpsPage />} />
-        <Route path="/reassign" element={<ReassignPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
-  );
+	return (
+		<Layout me={me.data}>
+			<Routes>
+				<Route path="/" element={<PipelinePage />} />
+				<Route path="/companies/:id" element={<CompanyPage />} />
+				<Route path="/follow-ups" element={<FollowUpsPage />} />
+				<Route path="/reassign" element={<ReassignPage />} />
+				<Route path="*" element={<Navigate to="/" replace />} />
+			</Routes>
+		</Layout>
+	);
 }

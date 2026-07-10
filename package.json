@@ -16,8 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm --prefix web run typecheck",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint": "biome check src web/src",
+    "lint:fix": "biome check --write src web/src"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

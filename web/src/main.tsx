@@ -7,21 +7,23 @@ import { ApiError } from "./lib/apiFetch.js";
 import "./styles.css";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Don't retry auth failures; TanStack + apiFetch already handle token refresh.
-      retry: (count, err) => !(err instanceof ApiError && [401, 403].includes(err.status)) && count < 1,
-      staleTime: 15_000,
-    },
-  },
+	defaultOptions: {
+		queries: {
+			// Don't retry auth failures; TanStack + apiFetch already handle token refresh.
+			retry: (count, err) =>
+				!(err instanceof ApiError && [401, 403].includes(err.status)) &&
+				count < 1,
+			staleTime: 15_000,
+		},
+	},
 });
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
+	<React.StrictMode>
+		<QueryClientProvider client={queryClient}>
+			<BrowserRouter>
+				<App />
+			</BrowserRouter>
+		</QueryClientProvider>
+	</React.StrictMode>,
 );

@@ -34,13 +34,10 @@ jobs:
       - name: Install web deps
         run: npm --prefix web ci
 
-      # Advisory only for now: the codebase isn't Biome-formatted yet, so this
-      # would fail on style/formatting noise rather than real defects. Kept
-      # visible in CI so issues are surfaced; flip `continue-on-error` to false
-      # once the code is formatted (`npm run lint:fix`) and a biome.json is added.
-      - name: Lint (Biome) — advisory
+      # Hard gate: Biome lint + format check over src/ and web/src/ (generated
+      # output like dist/ is excluded via the script's path scoping).
+      - name: Lint (Biome)
         run: npm run lint
-        continue-on-error: true
 
       - name: Typecheck (server + web)
         run: npm run typecheck

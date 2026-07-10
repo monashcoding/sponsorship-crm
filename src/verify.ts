@@ -17,41 +17,43 @@ const JWKS = createRemoteJWKSet(new URL(`${env.AUTH_URL}/api/auth/jwks`));
 
 /** The claims a verified MAC token is guaranteed to carry. */
 export interface MacClaims {
-  macUserId: string;
-  email: string;
-  roles: string[];
-  /** Functional team (e.g. "Events"), or null if the person isn't on the committee roster. */
-  team: string | null;
-  ver: number;
-  /**
-   * Display name. NOT in the current MAC token contract — it arrives only once mac-auth's
-   * roster/claims extension adds a `name` claim (see the CRM spec's SPEC_roster_and_claims.md
-   * dependency). Read forward-compatibly here: it's `undefined` today, and every consumer
-   * falls back to `email`, so it lights up automatically with zero code change when auth
-   * ships it. Do not gate anything on it.
-   */
-  name?: string;
+	macUserId: string;
+	email: string;
+	roles: string[];
+	/** Functional team (e.g. "Events"), or null if the person isn't on the committee roster. */
+	team: string | null;
+	ver: number;
+	/**
+	 * Display name. NOT in the current MAC token contract — it arrives only once mac-auth's
+	 * roster/claims extension adds a `name` claim (see the CRM spec's SPEC_roster_and_claims.md
+	 * dependency). Read forward-compatibly here: it's `undefined` today, and every consumer
+	 * falls back to `email`, so it lights up automatically with zero code change when auth
+	 * ships it. Do not gate anything on it.
+	 */
+	name?: string;
 }
 
 /**
  * Verify a MAC-issued JWT. Throws if the signature, issuer, audience, or expiry (`exp`)
  * is invalid. Returns the typed MAC claims on success.
  */
-export async function verifyMacToken(token: string | undefined): Promise<MacClaims> {
-  if (!token) throw new Error("missing token");
+export async function verifyMacToken(
+	token: string | undefined,
+): Promise<MacClaims> {
+	if (!token) throw new Error("missing token");
 
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: ISSUER, // checks `iss`
-    audience: AUDIENCE, // checks `aud`
-    // `exp` is enforced by jwtVerify automatically.
-  });
+	const { payload } = await jwtVerify(token, JWKS, {
+		issuer: ISSUER, // checks `iss`
+		audience: AUDIENCE, // checks `aud`
+		// `exp` is enforced by jwtVerify automatically.
+	});
 
-  return {
-    macUserId: payload.macUserId as string,
-    email: payload.email as string,
-    roles: (payload.roles as string[]) ?? [],
-    team: (payload.team as string | null) ?? null,
-    ver: (payload.ver as number) ?? 1,
-    name: (payload.name as string | undefined) ?? undefined,
-  };
+	return {
+		macUserId: payload.macUserId as string,
+		email: payload.email as string,
+		roles: (payload.roles as string[]) ?? [],
+		team: (payload.team as string | null) ?? null,
+		ver: (payload.ver as number) ?? 1,
+		name: (payload.name as string | undefined) ?? undefined,
+	};
 }
