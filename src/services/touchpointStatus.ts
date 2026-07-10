@@ -25,13 +25,18 @@ export async function recordTouchpointStatus(
 	});
 }
 
-// Future pluggable detectors implement this; MANUAL needs no detector.
-// A future GmailReplyDetector.poll() matches inbound mail to contacts, filters OOO
-// auto-replies, and passes results to recordTouchpointStatus with source:"gmail".
-// DO NOT BUILD NOW.
+// Pluggable detectors implement this; MANUAL needs no detector.
+// GmailReplyDetector.poll() (src/gmail/replyDetector.ts) matches inbound mail to
+// contacts, filters OOO auto-replies, detects bounces, and hands results to the
+// job runner, which is the ONLY thing that calls recordTouchpointStatus. Detectors
+// never write status themselves — they only READ to resolve a touchpointId.
+export interface DetectedStatus {
+	touchpointId: string;
+	status: "replied" | "bounced";
+	note?: string;
+}
+
 export interface ReplyDetector {
 	readonly source: "gmail";
-	poll(): Promise<
-		Array<{ touchpointId: string; status: "replied"; note?: string }>
-	>;
+	poll(): Promise<DetectedStatus[]>;
 }
